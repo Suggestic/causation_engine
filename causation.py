@@ -7,6 +7,7 @@ import matplotlib.pyplot as plt
 import random
 import numpy as np
 import os
+from sklearn.kernel_ridge import KernelRidge
 
 class causation(object):
     def __init__(self,X,Y):
@@ -24,7 +25,7 @@ class causation(object):
         correlation_coef, p_val = pearsonr(X,Y)
         return abs( correlation_coef[0] )
 
-    def ANM_predict_causality(self,train_size=0.7,independence_criterion='kruskal'):
+    def ANM_predict_causality(self,train_size=0.4,independence_criterion='kruskal'):
         '''
             Prediction of causality based on the bivariate additive noise model
 
@@ -37,12 +38,11 @@ class causation(object):
             Causal-direction: 1 if X causes Y, or -1 if Y causes X
         '''
         Xtrain, Xtest , Ytrain, Ytest = train_test_split(self.X, self.Y, train_size = train_size)
-        _gp = GaussianProcess(theta0=1000)
+        _gp = KernelRidge(kernel='sigmoid')#GaussianProcess(theta0=1000)
 
         #Forward case
         _gp.fit(Xtrain,Ytrain)
         errors_forward = _gp.predict(Xtest) - Ytest
-        forward_indep_score = 0.5
 
         #Backward case
         _gp.fit(Ytrain,Xtrain)
@@ -76,73 +76,6 @@ class causation(object):
         plt.scatter(self.X,self.Y)
         plt.show()
 
-
-def AMM_causality_prediction_concensus(X,Y,steps=50):
-    CO = causation(X,Y)
-    D = {1:[],-1:[]}
-    for i in xrange(steps):
-        d = CO.ANM_predict_causality()
-        D[d['causal_direction']].append(d['pvalscore'])
-
-    #plt.hist([D[1],D[-1]],bins=30,label=['(X,Y)','(Y,X)'],alpha=0.5)
-    #plt.legend()
-    #plt.show()
-
-    if len(D[1])> len(D[-1]):
-        return 1
-    else:
-        return -1
-
-def parse_ground_truth(fn='pair0001_des.txt'):
-    for l in open(fn):
-        if not l.startswith('ground truth:'):
-            continue
-        else:
-            break
-    cause = l.strip().split('-->')[0]
-    ground_truth = 1 if cause=='x' else -1
-    return ground_truth
-
-def benchmark_pairs_data(datasetdir='./pairs_dataset'):
-    datasets, ground_truths = dict(), dict()
-    bad_datas = set()
-    for root, dirs, filenames in os.walk(datasetdir):
-        for f in filenames:
-            key = f[:f.find('_')] if '_' in f else f[:f.find('.')]
-            print os.path.join(datasetdir,f)
-            if 'des' in f:
-                gt = parse_ground_truth( os.path.join(datasetdir,f) )
-                ground_truths[key] = gt
-            else:
-                fin = open( os.path.join(datasetdir,f) )
-                A, B = [], []
-                for l in fin:
-                    l = l.strip().split()
-                    if len(l) != 2:
-                        bad_datas.add(f)
-                        continue
-                    a, b = l
-                    if float(a) in A or float(b) in B: continue
-                    A.append(float(a))
-                    B.append(float(b))
-                datasets[key] = (A,B)
-
-    hit, nohit = 0., 0.
-    for f in datasets:
-        _a, _b = datasets[f]
-        if len(_a) == 0:
-            print 'Failed ', f
-            continue
-        print 'Processing ', f
-        pred  = AMM_causality_prediction_concensus(_a,_b)
-        real = ground_truths[f]
-        if pred == real:
-            hit += 1.
-        else:
-            nohit += 1.
-        print 'Current acc:', hit, nohit, float(hit/(hit+nohit))
-    acc = float(hit/(hit+nohit))
-    return acc
 
 def QA_single(steps=50,dataset_fn='pair0001.txt'):
     fin = open(dataset_fn)
@@ -186,4 +119,3 @@ if __name__ == '__main__':
         print '\n\n X --> Y'
     else:
         print '\n\n Y --> X'
-    print 'Final Benchmark Accuracy:', benchmark_pairs_data()

@@ -8,6 +8,10 @@ import random
 import numpy as np
 import os
 from sklearn.kernel_ridge import KernelRidge
+from scipy import stats
+
+import warnings
+warnings.filterwarnings('ignore')
 
 class causation(object):
     def __init__(self,X,Y):
@@ -77,14 +81,71 @@ class causation(object):
         plt.show()
 
 
+    def forceAspect(self,ax,aspect=1):
+        im = ax.get_images()
+        extent =  im[0].get_extent()
+        ax.set_aspect(abs((extent[1]-extent[0])/(extent[3]-extent[2]))/aspect)
+
+
+
+    def plot_data_density(self,bw_method='scott'):
+        '''
+            Plot of data points and estimated joint density
+
+            Parameters
+            ----------
+            bw_method : KDE estimator bandwidth. 'scott', 'silverman' or
+                        scipy.stats.gaussian_kde instance
+
+            Returns
+            -------
+            None
+        '''
+        m1, m2 = (self.X.T), (self.Y.T)
+        eps1 = 0.5*np.std(m1)
+        eps2 = 0.5*np.std(m2)
+        xmin = m1.min() - eps1
+        xmax = m1.max() + eps1
+        ymin = m2.min() - eps2
+        ymax = m2.max() + eps2
+        X, Y = np.mgrid[xmin:xmax:50j, ymin:ymax:50j]
+        positions = np.vstack([X.ravel(), Y.ravel()])
+        values = np.vstack([m1, m2])
+        kernel = stats.gaussian_kde(values,bw_method=bw_method)
+        Z = np.reshape(kernel(positions).T, X.shape)
+        fig = plt.figure(figsize=(11, 5))
+        ax = fig.add_subplot(111)
+        ax.imshow(np.rot90(Z), cmap=plt.cm.RdYlBu,
+                   extent=[xmin, xmax, ymin, ymax])
+        ax.plot(m1, m2, 'k.', markersize=5,linewidth='0.1',color='b',alpha=0.4)
+        ax.set_xlim([xmin, xmax])
+        ax.set_ylim([ymin, ymax])
+        self.forceAspect(ax,aspect=1)
+        plt.show()
+
+        return None
+
+def AMM_bagging_causality_prediction(X,Y,steps=100):
+    CO = causation(X,Y)
+    D = {1:[],-1:[]}
+    for i in xrange(steps):
+        d = CO.ANM_predict_causality()
+        D[d['causal_direction']].append(d['pvalscore'])
+
+    #plt.hist([D[1],D[-1]],bins=30,label=['(X,Y)','(Y,X)'],alpha=0.5)
+    #plt.legend()
+    #plt.show()
+
+    if len(D[1])> len(D[-1]):
+        return 1
+    else:
+        return -1
+
+
+
 def QA_single(steps=50,dataset_fn='pair0001.txt'):
-    fin = open(dataset_fn)
-    A, B = [], []
-    for l in fin:
-        a, b = l.strip().split()
-        if float(a) in A or float(b) in B: continue
-        A.append(float(a))
-        B.append(float(b))
+    Z = np.loadtxt(dataset_fn)
+    A, B = Z[:,0], Z[:,1]
 
     plt.scatter(A,B)
     plt.show()

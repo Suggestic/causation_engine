@@ -2,21 +2,6 @@ import os
 from causation import *
 import sys
 
-def AMM_causality_prediction_concensus(X,Y,steps=100):
-    CO = causation(X,Y)
-    D = {1:[],-1:[]}
-    for i in xrange(steps):
-        d = CO.ANM_predict_causality()
-        D[d['causal_direction']].append(d['pvalscore'])
-
-    #plt.hist([D[1],D[-1]],bins=30,label=['(X,Y)','(Y,X)'],alpha=0.5)
-    #plt.legend()
-    #plt.show()
-
-    if len(D[1])> len(D[-1]):
-        return 1
-    else:
-        return -1
 
 def parse_ground_truth(fn='pair0001_des.txt'):
     for l in open(fn):
@@ -60,7 +45,7 @@ def benchmark_pairs_data(datasetdir='./pairs_dataset'):
             continue
         print '\nProcessing ', f
         try:
-            pred  = AMM_causality_prediction_concensus(_a,_b)
+            pred  = AMM_bagging_causality_prediction(_a,_b)
         except:
             print sys.exc_info()[0]
             print 'Failed ', f

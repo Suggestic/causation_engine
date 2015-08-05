@@ -9,8 +9,9 @@ import numpy as np
 import os
 from sklearn.kernel_ridge import KernelRidge
 from scipy import stats
-
+from sklearn.metrics.pairwise import pairwise_kernels
 import warnings
+from scipy.stats import mannwhitneyu
 warnings.filterwarnings('ignore')
 
 class causation(object):
@@ -29,13 +30,15 @@ class causation(object):
         correlation_coef, p_val = pearsonr(X,Y)
         return abs( correlation_coef[0] )
 
-    def ANM_predict_causality(self,train_size=0.4,independence_criterion='kruskal'):
+    def ANM_predict_causality(self,train_size=0.5,independence_criterion='HSIC'):
         '''
             Prediction of causality based on the bivariate additive noise model
 
             Parameters
             ----------
-            independence_criterion : kruskal for Kruskal-Wallis H-test
+            independence_criterion :
+                kruskal for Kruskal-Wallis H-test,
+                HSIC for Hilbert-Schmidt Independence Criterion
 
             Returns
             -------
@@ -55,11 +58,13 @@ class causation(object):
         #Independence score
 
         forward_indep_pval = {
-            'kruskal': kruskal(errors_forward,Xtest)[1]
+            'kruskal': kruskal(errors_forward,Xtest)[1],
+            'HSIC': self.HilbertSchmidtNormIC(errors_forward,Xtest)[1]
         }[independence_criterion]
 
         backward_indep_pval = {
-            'kruskal': kruskal(errors_backward,Ytest)[1]
+            'kruskal': kruskal(errors_backward,Ytest)[1],
+            'HSIC': self.HilbertSchmidtNormIC(errors_backward,Ytest)[1]
         }[independence_criterion]
 
         #print 'Scores:', forward_indep_pval, backward_indep_pval
@@ -74,7 +79,35 @@ class causation(object):
         return {'causal_direction':self.causal_direction,'pvalscore':self.pvalscore}
 
 
+    def HilbertSchmidtNormIC(self,X,Y):
+        '''
+            Procedure to calculate the Hilbert-Schmidt Independence Criterion described in
+            "Measuring Statistical Dependence with Hilbert-Schmidt Norms", Arthur Gretton et al.
 
+            Parameters
+            ----------
+            Assuming a joint distribution P(X,Y)
+            X :
+                list of X observations
+            Y : list of Y obervations
+
+            Returns
+            -------
+            (HSIC, fake-p-value scaling HSIC to [0,1])
+        '''
+        m = float(len(X))
+        K = pairwise_kernels(X,X,metric='linear')
+        L = pairwise_kernels(Y,Y,metric='linear')
+        H = np.eye(m)-1/m#*np.ones(m,m)
+
+        res = (1/(m-1)**2 ) * np.trace(np.dot(np.dot(np.dot(K,H),L),H))
+
+        #Another way, maybe..
+        #CCm = pairwise_kernels(self.X,self.Y)
+        #res = sum(np.linalg.eigvals(CCm))
+
+        #return (res,1-(1/(1+res) ) )
+        return (res,res )
 
     def plot_data(self):
         plt.scatter(self.X,self.Y)
@@ -88,7 +121,6 @@ class causation(object):
         im = ax.get_images()
         extent =  im[0].get_extent()
         ax.set_aspect(abs((extent[1]-extent[0])/(extent[3]-extent[2]))/aspect)
-
 
 
     def plot_data_density(self,bw_method='scott'):
@@ -159,9 +191,18 @@ def QA_single(steps=50,dataset_fn='pair0001.txt'):
         d = CO.ANM_predict_causality()
         D[d['causal_direction']].append(d['pvalscore'])
 
-    plt.hist([D[1],D[-1]],bins=30,label=['(X,Y)','(Y,X)'],alpha=0.5)
+    plt.hist([D[1],D[-1]],bins=40,label=['(X,Y)','(Y,X)'],alpha=0.5,histtype='stepfilled')
     plt.legend()
     plt.show()
+
+    print '#X->Y:', len(D[1])
+    print '#Y->X:', len(D[-1])
+    print 'mean X->Y:', np.mean(D[1])
+    print 'mean Y->X:', np.mean(D[-1])
+
+    mwu = mannwhitneyu(D[1],D[-1])
+    print 'mannwhitneyu:', mwu
+
 
     if len(D[1])> len(D[-1]):
         return 1
@@ -177,9 +218,17 @@ def main():
     print 'cause (A,B)?:', CO.ANM_predict_causality()
     CO.plot_data()
 
+def HSICtest():
+    dataset_fn='pair0001.txt'
+    Z = np.loadtxt(dataset_fn)
+    A, B = Z[:,0], Z[:,1]
+    print 'cause (A,B)?:', causation(A,B).ANM_predict_causality()
+    print 'cause (B,A)?:', causation(B,A).ANM_predict_causality()
+
 if __name__ == '__main__':
-    main()
-    if QA_single() == 1:
-        print '\n\n X --> Y'
-    else:
-        print '\n\n Y --> X'
+    #main()
+    #if QA_single() == 1:
+    #    print '\n\n X --> Y'
+    #else:
+    #    print '\n\n Y --> X'
+    HSICtest()

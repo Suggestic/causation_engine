@@ -45,7 +45,7 @@ class causation(object):
             Causal-direction: 1 if X causes Y, or -1 if Y causes X
         '''
         Xtrain, Xtest , Ytrain, Ytest = train_test_split(self.X, self.Y, train_size = train_size)
-        _gp = KernelRidge(kernel='sigmoid')#GaussianProcess(theta0=1000)
+        _gp = KernelRidge(kernel='linear')#GaussianProcess(theta0=1000)
 
         #Forward case
         _gp.fit(Xtrain,Ytrain)
@@ -96,8 +96,8 @@ class causation(object):
             (HSIC, fake-p-value scaling HSIC to [0,1])
         '''
         m = float(len(X))
-        K = pairwise_kernels(X,X,metric='linear')
-        L = pairwise_kernels(Y,Y,metric='linear')
+        K = pairwise_kernels(X,X,metric='cosine')
+        L = pairwise_kernels(Y,Y,metric='cosine')
         H = np.eye(m)-1/m
 
         res = (1/(m-1)**2 ) * np.trace(np.dot(np.dot(np.dot(K,H),L),H))
@@ -175,7 +175,11 @@ def AMM_bagging_causality_prediction(X,Y,steps=100):
     #plt.legend()
     #plt.show()
 
-    if np.mean(_D[1]) > np.mean(_D[-1]):
+    meanxy, meanyx = np.mean(_D[1]), np.mean(_D[-1])
+    meanxy = 0 if np.isnan(meanxy) else meanxy
+    meanyx = 0 if np.isnan(meanyx) else meanyx
+
+    if meanxy > meanyx:
         return 1
     else:
         return -1
@@ -204,16 +208,21 @@ def QA_single(steps=50,dataset_fn='pair0001.txt'):
     plt.legend()
     plt.show()
 
+    meanxy, meanyx = np.mean(_D[1]), np.mean(_D[-1])
+    meanxy = 0 if np.isnan(meanxy) else meanxy
+    meanyx = 0 if np.isnan(meanyx) else meanyx
+
+
     print '#X->Y:', len(_D[1])
     print '#Y->X:', len(_D[-1])
-    print 'mean X->Y:', np.mean(_D[1])
-    print 'mean Y->X:', np.mean(_D[-1])
+    print 'mean X->Y:', meanxy
+    print 'mean Y->X:', meanyx
 
     mwu = mannwhitneyu(_D[1],_D[-1])
     print 'mannwhitneyu:', mwu
 
 
-    if np.mean(_D[1]) > np.mean(_D[-1]):
+    if meanxy > meanyx:
         return 1
     else:
         return -1

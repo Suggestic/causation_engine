@@ -76,7 +76,7 @@ class causation(object):
             self.causal_direction = -1
             self.pvalscore = backward_indep_pval
 
-        return {'causal_direction':self.causal_direction,'pvalscore':self.pvalscore}
+        return {'causal_direction':self.causal_direction,'pvalscore':self.pvalscore,'difways':abs(forward_indep_pval-backward_indep_pval)}
 
 
     def HilbertSchmidtNormIC(self,X,Y):
@@ -98,7 +98,7 @@ class causation(object):
         m = float(len(X))
         K = pairwise_kernels(X,X,metric='linear')
         L = pairwise_kernels(Y,Y,metric='linear')
-        H = np.eye(m)-1/m#*np.ones(m,m)
+        H = np.eye(m)-1/m
 
         res = (1/(m-1)**2 ) * np.trace(np.dot(np.dot(np.dot(K,H),L),H))
 
@@ -163,15 +163,19 @@ class causation(object):
 def AMM_bagging_causality_prediction(X,Y,steps=100):
     CO = causation(X,Y)
     D = {1:[],-1:[]}
+    _D = {1:[],-1:[]}
+
     for i in xrange(steps):
         d = CO.ANM_predict_causality()
         D[d['causal_direction']].append(d['pvalscore'])
+        _D[d['causal_direction']].append(d['difways'])
+
 
     #plt.hist([D[1],D[-1]],bins=30,label=['(X,Y)','(Y,X)'],alpha=0.5)
     #plt.legend()
     #plt.show()
 
-    if len(D[1])> len(D[-1]):
+    if np.mean(_D[1]) > np.mean(_D[-1]):
         return 1
     else:
         return -1
@@ -187,24 +191,29 @@ def QA_single(steps=50,dataset_fn='pair0001.txt'):
 
     CO = causation(A,B)
     D = {1:[],-1:[]}
+    _D = {1:[],-1:[]}
+
     for i in xrange(steps):
         d = CO.ANM_predict_causality()
         D[d['causal_direction']].append(d['pvalscore'])
+        _D[d['causal_direction']].append(d['difways'])
 
-    plt.hist([D[1],D[-1]],bins=40,label=['(X,Y)','(Y,X)'],alpha=0.5,histtype='stepfilled')
+    #plt.hist([D[1],D[-1]],bins=40,label=['(X,Y)','(Y,X)'],alpha=0.5,histtype='stepfilled')
+    plt.hist([_D[1],_D[-1]],bins=40,label=['(X,Y)','(Y,X)'],alpha=0.5,histtype='stepfilled')
+
     plt.legend()
     plt.show()
 
-    print '#X->Y:', len(D[1])
-    print '#Y->X:', len(D[-1])
-    print 'mean X->Y:', np.mean(D[1])
-    print 'mean Y->X:', np.mean(D[-1])
+    print '#X->Y:', len(_D[1])
+    print '#Y->X:', len(_D[-1])
+    print 'mean X->Y:', np.mean(_D[1])
+    print 'mean Y->X:', np.mean(_D[-1])
 
-    mwu = mannwhitneyu(D[1],D[-1])
+    mwu = mannwhitneyu(_D[1],_D[-1])
     print 'mannwhitneyu:', mwu
 
 
-    if len(D[1])> len(D[-1]):
+    if np.mean(_D[1]) > np.mean(_D[-1]):
         return 1
     else:
         return -1

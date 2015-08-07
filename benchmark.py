@@ -45,13 +45,13 @@ def benchmark_pairs_data(datasetdir='./pairs_dataset'):
             continue
         print '\nProcessing ', f
         try:
-            pred  = AMM_bagging_causality_prediction(_a,_b)
+            pred  = AMM_bagging_causality_prediction(_a,_b)['finalscore']
         except:
             print sys.exc_info()[0]
             print 'Failed ', f
             continue
         real = ground_truths[f]
-        if pred == real:
+        if pred*real > 0:
             hit += 1.
         else:
             nohit += 1.

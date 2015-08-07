@@ -45,7 +45,7 @@ class causation(object):
             Causal-direction: 1 if X causes Y, or -1 if Y causes X
         '''
         Xtrain, Xtest , Ytrain, Ytest = train_test_split(self.X, self.Y, train_size = train_size)
-        _gp = KernelRidge(kernel='linear')#GaussianProcess(theta0=1000)
+        _gp = KernelRidge(kernel='rbf')#GaussianProcess(theta0=1000)
 
         #Forward case
         _gp.fit(Xtrain,Ytrain)
@@ -96,8 +96,8 @@ class causation(object):
             (HSIC, fake-p-value scaling HSIC to [0,1])
         '''
         m = float(len(X))
-        K = pairwise_kernels(X,X,metric='cosine')
-        L = pairwise_kernels(Y,Y,metric='cosine')
+        K = pairwise_kernels(X,X,metric='linear')
+        L = pairwise_kernels(Y,Y,metric='linear')
         H = np.eye(m)-1/m
 
         res = (1/(m-1)**2 ) * np.trace(np.dot(np.dot(np.dot(K,H),L),H))
@@ -123,7 +123,7 @@ class causation(object):
         ax.set_aspect(abs((extent[1]-extent[0])/(extent[3]-extent[2]))/aspect)
 
 
-    def plot_data_density(self,bw_method='scott'):
+    def plot_data_densities(self,bw_method='scott'):
         '''
             Plot of data points and estimated joint density
 
@@ -144,23 +144,102 @@ class causation(object):
         ymin = m2.min() - eps2
         ymax = m2.max() + eps2
         X, Y = np.mgrid[xmin:xmax:50j, ymin:ymax:50j]
+
         positions = np.vstack([X.ravel(), Y.ravel()])
+        positionsx = np.vstack([X.ravel()])
+        positionsy = np.vstack([Y.ravel()])
+
         values = np.vstack([m1, m2])
+        valuesx = m1
+        valuesy = m2
+
         kernel = stats.gaussian_kde(values,bw_method=bw_method)
+        kernelx = stats.gaussian_kde(valuesx,bw_method=bw_method)
+        kernely = stats.gaussian_kde(valuesy,bw_method=bw_method)
+
         Z = np.reshape(kernel(positions).T, X.shape)
-        fig = plt.figure(figsize=(11, 5))
-        ax = fig.add_subplot(111)
-        ax.imshow(np.rot90(Z), cmap=plt.cm.RdYlBu,
+        _x = np.reshape(kernelx(positionsx).T, X.shape)
+        _y = np.reshape(kernely(positionsy).T, X.shape)
+        Zx = Z/_y
+        Zy = Z/_x
+        Zw = _x*_y
+        #fig = plt.figure(figsize=(12, 6))
+        f, ((ax1, ax2, ax5), (ax3, ax4, ax6)) = plt.subplots(2, 3, sharex='col', sharey='row',figsize=(17, 10))
+        f.subplots_adjust(hspace=0.1)
+        f.subplots_adjust(wspace=0.1)
+
+        #ax = fig.add_subplot(221)
+        ax1.imshow(np.rot90(Z), cmap=plt.cm.RdYlBu,
                    extent=[xmin, xmax, ymin, ymax])
-        ax.plot(m1, m2, 'k.', markersize=5,linewidth='0.1',color='b',alpha=0.4)
-        ax.set_xlim([xmin, xmax])
-        ax.set_ylim([ymin, ymax])
-        self.forceAspect(ax,aspect=1)
+        ax1.plot(m1, m2, 'k.', markersize=5,linewidth='0.1',color='b',alpha=0.4)
+
+        #ax = fig.add_subplot(222)
+        ax2.imshow(np.rot90(Zx), cmap=plt.cm.RdYlBu,
+                   extent=[xmin, xmax, ymin, ymax])
+        ax2.plot(m1, m2, 'k.', markersize=5,linewidth='0.1',color='b',alpha=0.4)
+
+        #ax = fig.add_subplot(223)
+        ax3.imshow(np.rot90(Zy), cmap=plt.cm.RdYlBu,
+                   extent=[xmin, xmax, ymin, ymax])
+        ax3.plot(m1, m2, 'k.', markersize=5,linewidth='0.1',color='b',alpha=0.4)
+
+        ax4.imshow(np.rot90(Zw), cmap=plt.cm.RdYlBu,
+                   extent=[xmin, xmax, ymin, ymax])
+        ax4.plot(m1, m2, 'k.', markersize=5,linewidth='0.1',color='b',alpha=0.4)
+
+        ax5.imshow(np.rot90(_x), cmap=plt.cm.RdYlBu,
+                   extent=[xmin, xmax, ymin, ymax])
+        ax5.plot(m1, m2, 'k.', markersize=5,linewidth='0.1',color='b',alpha=0.4)
+
+        ax6.imshow(np.rot90(_y), cmap=plt.cm.RdYlBu,
+                   extent=[xmin, xmax, ymin, ymax])
+        ax6.plot(m1, m2, 'k.', markersize=5,linewidth='0.1',color='b',alpha=0.4)
+
+        ax1.set_title('P(X,Y)')
+        ax2.set_title('P(X|Y)')
+        ax3.set_title('P(Y|X)')
+        ax4.set_title('P(X)*P(Y)')
+        ax5.set_title('P(X)')
+        ax6.set_title('P(Y)')
+
+
+
+        ax1.set_xlim([xmin, xmax])
+        ax1.set_ylim([ymin, ymax])
+        ax2.set_xlim([xmin, xmax])
+        ax2.set_ylim([ymin, ymax])
+        ax3.set_xlim([xmin, xmax])
+        ax3.set_ylim([ymin, ymax])
+        ax4.set_xlim([xmin, xmax])
+        ax4.set_ylim([ymin, ymax])
+        ax5.set_xlim([xmin, xmax])
+        ax5.set_ylim([ymin, ymax])
+        ax6.set_xlim([xmin, xmax])
+        ax6.set_ylim([ymin, ymax])
+
+        ax1.axis('off')
+        ax2.axis('off')
+        ax3.axis('off')
+        ax4.axis('off')
+        ax5.axis('off')
+        ax6.axis('off')
+
+        self.forceAspect(ax1,aspect=1)
+        self.forceAspect(ax2,aspect=1)
+        self.forceAspect(ax3,aspect=1)
+        self.forceAspect(ax4,aspect=1)
+        self.forceAspect(ax5,aspect=1)
+        self.forceAspect(ax6,aspect=1)
+
+
+        plt.setp([a.get_xticklabels() for a in [ax3,ax4,ax6]], visible=False)
+        plt.setp([a.get_yticklabels() for a in [ax1,ax3,ax6]], visible=False)
+
         plt.show()
 
         return None
 
-def AMM_bagging_causality_prediction(X,Y,steps=100):
+def AMM_bagging_causality_prediction(X,Y,steps=26):
     CO = causation(X,Y)
     D = {1:[],-1:[]}
     _D = {1:[],-1:[]}
@@ -176,13 +255,15 @@ def AMM_bagging_causality_prediction(X,Y,steps=100):
     #plt.show()
 
     meanxy, meanyx = np.mean(_D[1]), np.mean(_D[-1])
+    sumxy, sumyx = sum(_D[1]), sum(_D[-1])
     meanxy = 0 if np.isnan(meanxy) else meanxy
     meanyx = 0 if np.isnan(meanyx) else meanyx
+    mwu = mannwhitneyu(_D[1],_D[-1])
 
-    if meanxy > meanyx:
-        return 1
+    if sumxy > sumyx:
+        return {'causal_direction':1,'finalscore': 1/(1+mwu[1])}
     else:
-        return -1
+        return {'causal_direction':-1,'finalscore': -1/(1+mwu[1])}
 
 
 
@@ -209,20 +290,21 @@ def QA_single(steps=50,dataset_fn='pair0001.txt'):
     plt.show()
 
     meanxy, meanyx = np.mean(_D[1]), np.mean(_D[-1])
+    sumxy, sumyx = sum(_D[1]), sum(_D[-1])
     meanxy = 0 if np.isnan(meanxy) else meanxy
     meanyx = 0 if np.isnan(meanyx) else meanyx
-
 
     print '#X->Y:', len(_D[1])
     print '#Y->X:', len(_D[-1])
     print 'mean X->Y:', meanxy
     print 'mean Y->X:', meanyx
-
+    print 'sum X->Y:', sumxy
+    print 'sum Y->X:', sumyx
     mwu = mannwhitneyu(_D[1],_D[-1])
     print 'mannwhitneyu:', mwu
 
 
-    if meanxy > meanyx:
+    if sumxy > sumyx:
         return 1
     else:
         return -1

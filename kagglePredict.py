@@ -18,9 +18,9 @@ def make_preds(fn_train='CEfinal_valid_pairs.csv'):
     fout = open('kagglePreds.csv','w',0)
     fout.write("SampleID,Target\n")
     for i in xrange(len(Xs)):
-        pred  = AMM_bagging_causality_prediction(Xs[i],Ys[i])
+        pred  = AMM_bagging_causality_prediction(Xs[i],Ys[i])['finalscore']
         fout.write("%s,%s\n" % (names[i],pred))
-        print "%s,%s\n" % (names[i],pred)
+        print "%s,%s" % (names[i],pred)
 
 
 if __name__ == '__main__':

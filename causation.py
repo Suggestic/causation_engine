@@ -45,7 +45,7 @@ class causation(object):
             Causal-direction: 1 if X causes Y, or -1 if Y causes X
         '''
         Xtrain, Xtest , Ytrain, Ytest = train_test_split(self.X, self.Y, train_size = train_size)
-        _gp = KernelRidge(kernel='poly')#GaussianProcess()#
+        _gp = KernelRidge(kernel='rbf')#GaussianProcess()#
 
         #Forward case
         _gp.fit(Xtrain,Ytrain)
@@ -96,8 +96,8 @@ class causation(object):
             (HSIC, fake-p-value scaling HSIC to [0,1])
         '''
         m = float(len(X))
-        K = pairwise_kernels(X,X,metric='rbf')
-        L = pairwise_kernels(Y,Y,metric='rbf')
+        K = pairwise_kernels(X,X,metric='linear')
+        L = pairwise_kernels(Y,Y,metric='linear')
         H = np.eye(m)-1/m
 
         res = (1/(m-1)**2 ) * np.trace(np.dot(np.dot(np.dot(K,H),L),H))

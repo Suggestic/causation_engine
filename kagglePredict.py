@@ -4,21 +4,22 @@ import sys
 from multiprocessing import Pool
 from threading import BoundedSemaphore
 from random import randint
+import shelve
 
-
-dictres = dict()
 
 pool_sema = BoundedSemaphore(value=1)
 
 def ANM_wrap(D):
     name,X, Y = D[0], D[1], D[2]
-    print 'Processing:', name, len(X), len(Y)
     res = AMM_bagging_causality_prediction(X,Y)['finalscore']
     pool_sema.acquire()
+    dictres = shelve.open('shelveKaggleResDict')
     dictres[name] = res
+    print "\n%s,%s" % (name,res)
+    print 'Already processed: ', len(dictres)
+    #print dictres
+    dictres.close()
     pool_sema.release()
-    print len(dictres)
-    print "%s,%s" % (name,res)
 
 def make_datasets(fn_train='CEfinal_valid_pairs.csv'):
     fin = open(fn_train,'r')
@@ -36,14 +37,16 @@ def make_datasets(fn_train='CEfinal_valid_pairs.csv'):
     return {'names':names,'Xs':Xs,'Ys':Ys}
 
 def main():
+
     dss = make_datasets()
     names, Xs, Ys = dss['names'], dss['Xs'], dss['Ys']
+
     fout = open('kagglePreds.csv','w',0)
     fout.write("SampleID,Target\n")
 
     args = [x for x in zip(names,Xs,Ys)]
 
-    p = Pool(randint(2,4))
+    p = Pool(randint(3,4))
     p.map( ANM_wrap, args )
     p.close()
     p.join()

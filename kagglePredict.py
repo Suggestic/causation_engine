@@ -11,7 +11,19 @@ pool_sema = BoundedSemaphore(value=1)
 
 def ANM_wrap(D):
     name,X, Y = D[0], D[1], D[2]
+
+    pool_sema.acquire()
+    dictres = shelve.open('shelveKaggleResDict')
+
+    if name in dictres:
+        dictres.close()
+        return 1
+
+    dictres.close()
+    pool_sema.release()
+
     res = AMM_bagging_causality_prediction(X,Y)['finalscore']
+
     pool_sema.acquire()
     dictres = shelve.open('shelveKaggleResDict')
     dictres[name] = res
@@ -20,6 +32,7 @@ def ANM_wrap(D):
     #print dictres
     dictres.close()
     pool_sema.release()
+    return 0
 
 def make_datasets(fn_train='CEfinal_valid_pairs.csv'):
     fin = open(fn_train,'r')
@@ -46,10 +59,12 @@ def main():
 
     args = [x for x in zip(names,Xs,Ys)]
 
-    p = Pool(randint(3,4))
+    p = Pool(4)#randint(3,4))
     p.map( ANM_wrap, args )
     p.close()
     p.join()
+
+    dictres = shelve.open('shelveKaggleResDict')
 
 
     for i in xrange(len(Xs)):

@@ -45,7 +45,7 @@ class causation(object):
             Causal-direction: 1 if X causes Y, or -1 if Y causes X
         '''
         Xtrain, Xtest , Ytrain, Ytest = train_test_split(self.X, self.Y, train_size = train_size)
-        _gp = KernelRidge(kernel='rbf')#GaussianProcess()#
+        _gp = KernelRidge(kernel='polynomial',degree=3)#GaussianProcess()#
 
         #Forward case
         _gp.fit(Xtrain,Ytrain)

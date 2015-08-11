@@ -30,7 +30,7 @@ class causation(object):
         correlation_coef, p_val = pearsonr(X,Y)
         return abs( correlation_coef[0] )
 
-    def ANM_predict_causality(self,train_size=0.5,independence_criterion='HSIC'):
+    def ANM_predict_causality(self,train_size=0.5,independence_criterion='HSIC',metric='linear'):
         '''
             Prediction of causality based on the bivariate additive noise model
 
@@ -45,7 +45,7 @@ class causation(object):
             Causal-direction: 1 if X causes Y, or -1 if Y causes X
         '''
         Xtrain, Xtest , Ytrain, Ytest = train_test_split(self.X, self.Y, train_size = train_size)
-        _gp = KernelRidge(kernel='polynomial',degree=3)#GaussianProcess()#
+        _gp = KernelRidge(kernel='rbf',degree=3)#GaussianProcess()#
 
         #Forward case
         _gp.fit(Xtrain,Ytrain)
@@ -79,7 +79,7 @@ class causation(object):
         return {'causal_direction':self.causal_direction,'pvalscore':self.pvalscore,'difways':abs(forward_indep_pval-backward_indep_pval)}
 
 
-    def HilbertSchmidtNormIC(self,X,Y):
+    def HilbertSchmidtNormIC(self,X,Y,metric='linear'):
         '''
             Procedure to calculate the Hilbert-Schmidt Independence Criterion described in
             "Measuring Statistical Dependence with Hilbert-Schmidt Norms", Arthur Gretton et al.
@@ -96,8 +96,8 @@ class causation(object):
             (HSIC, fake-p-value scaling HSIC to [0,1])
         '''
         m = float(len(X))
-        K = pairwise_kernels(X,X,metric='linear')
-        L = pairwise_kernels(Y,Y,metric='linear')
+        K = pairwise_kernels(X,X,metric=metric)
+        L = pairwise_kernels(Y,Y,metric=metric)
         H = np.eye(m)-1/m
 
         res = (1/(m-1)**2 ) * np.trace(np.dot(np.dot(np.dot(K,H),L),H))
@@ -239,13 +239,13 @@ class causation(object):
 
         return None
 
-def AMM_bagging_causality_prediction(X,Y,steps=26):
+def AMM_bagging_causality_prediction(X,Y,steps=26,independence_criterion='HSIC',metric='linear'):
     CO = causation(X,Y)
     D = {1:[],-1:[]}
     _D = {1:[],-1:[]}
 
     for i in xrange(steps):
-        d = CO.ANM_predict_causality()
+        d = CO.ANM_predict_causality(independence_criterion=independence_criterion,metric=metric)
         D[d['causal_direction']].append(d['pvalscore'])
         _D[d['causal_direction']].append(d['difways'])
 

@@ -17,6 +17,7 @@ def ANM_wrap(D):
 
     if name in dictres:
         dictres.close()
+        print 'Skipping ', name
         return 1
 
     dictres.close()

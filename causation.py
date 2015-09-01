@@ -12,6 +12,9 @@ from scipy import stats
 from sklearn.metrics.pairwise import pairwise_kernels
 import warnings
 from scipy.stats import mannwhitneyu
+import pyGPs
+
+
 warnings.filterwarnings('ignore')
 
 class causation(object):
@@ -77,6 +80,65 @@ class causation(object):
             self.pvalscore = backward_indep_pval
 
         return {'causal_direction':self.causal_direction,'pvalscore':self.pvalscore,'difways':abs(forward_indep_pval-backward_indep_pval)}
+
+
+
+    def ANM_causation_score(self,train_size=0.5,independence_criterion='HSIC',metric='sigmoid',regression_method='GP'):
+        '''
+            Measure how likely a given causal direction is true
+
+            Parameters
+            ----------
+            train_size :
+                Fraction of given data used to training phase
+
+            independence_criterion :
+                kruskal for Kruskal-Wallis H-test,
+                HSIC for Hilbert-Schmidt Independence Criterion
+
+            metric :
+                linear, sigmoid, rbf, poly
+                kernel function to compute gramm matrix for HSIC
+                gaussian kernel is used in :
+                Nonlinear causal discovery with additive noise models
+                Patrik O. Hoyer et. al
+
+            Returns
+            -------
+            causal_strength: A float between 0. and 1.
+        '''
+        Xtrain, Xtest , Ytrain, Ytest = train_test_split(self.X, self.Y, train_size = train_size)
+        if regression_method == 'GP':
+            _gp = GaussianProcess(regr='quadratic')#KernelRidge(kernel='sigmoid',degree=3)
+
+            _gp = pyGPs.GPR()      # specify model (GP regression)
+            _gp.getPosterior(Xtrain, Ytrain) # fit default model (mean zero & rbf kernel) with data
+            _gp.optimize(Xtrain, Ytrain)     # optimize hyperparamters (default optimizer: single run minimize)
+
+            #Forward case
+            #_gp = KernelRidge(kernel='sigmoid',degree=3)
+            #_gp.fit(Xtrain,Ytrain)
+            ym, ys2, fm, fs2, lp = _gp.predict(Xtest)
+            _gp.plot()
+            #errors_forward = _gp.predict(Xtest) - Ytest
+            errors_forward = ym - Ytest
+        else:
+            _gp = KernelRidge(kernel='sigmoid')
+            _gp.fit(Xtrain, Ytrain)
+            errors_forward = _gp.predict(Xtest) - Ytest
+
+        #Independence score
+
+        forward_indep_pval = {
+            'kruskal': kruskal(errors_forward,Xtest)[1],
+            'HSIC': self.HilbertSchmidtNormIC(errors_forward,Xtest)[1]
+        }[independence_criterion]
+
+
+        return {'causal_strength':forward_indep_pval}
+
+
+
 
 
     def HilbertSchmidtNormIC(self,X,Y,metric='linear'):

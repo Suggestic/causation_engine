@@ -41,7 +41,7 @@ def make_datasets(fn_train='CEfinal_valid_pairs.csv'):
     names, Xs, Ys = [], [], []
     for l in fin:
         l = l.strip().split(',')
-        name = l[0]
+        name = l[0].replace('valid','test')
         X = [float(x) for x in l[1].split()]
         Y = [float(y) for y in l[2].split()]
         names.append(name)

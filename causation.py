@@ -48,15 +48,27 @@ class causation(object):
             Causal-direction: 1 if X causes Y, or -1 if Y causes X
         '''
         Xtrain, Xtest , Ytrain, Ytest = train_test_split(self.X, self.Y, train_size = train_size)
-        _gp = KernelRidge(kernel='rbf',degree=3)#GaussianProcess()#
+        #_gp = KernelRidge(kernel='rbf',degree=3)#GaussianProcess()#
 
         #Forward case
-        _gp.fit(Xtrain,Ytrain)
-        errors_forward = _gp.predict(Xtest) - Ytest
+        #_gp.fit(Xtrain,Ytrain)
+        #errors_forward = _gp.predict(Xtest) - Ytest
+        _gp = pyGPs.GPR()
+        _gp.getPosterior(Xtrain, Ytrain)
+        _gp.optimize(Xtrain, Ytrain)
+        ym, ys2, fm, fs2, lp = _gp.predict(Xtest)
+        errors_forward = ym - Ytest
+
 
         #Backward case
-        _gp.fit(Ytrain,Xtrain)
-        errors_backward = _gp.predict(Ytest) - Xtest
+        #_gp.fit(Ytrain,Xtrain)
+        #errors_backward = _gp.predict(Ytest) - Xtest
+        _gp = pyGPs.GPR()
+        _gp.getPosterior(Ytrain, Xtrain)
+        _gp.optimize(Ytrain, Xtrain)
+        ym, ys2, fm, fs2, lp = _gp.predict(Ytest)
+        errors_backward = ym - Xtest
+
 
         #Independence score
 
@@ -72,7 +84,8 @@ class causation(object):
 
         #print 'Scores:', forward_indep_pval, backward_indep_pval
 
-        if forward_indep_pval < backward_indep_pval:
+        #Warning it should be <
+        if forward_indep_pval > backward_indep_pval:
             self.causal_direction = 1
             self.pvalscore = forward_indep_pval
         else:
@@ -83,7 +96,7 @@ class causation(object):
 
 
 
-    def ANM_causation_score(self,train_size=0.5,independence_criterion='HSIC',metric='sigmoid',regression_method='GP'):
+    def ANM_causation_score(self,train_size=0.5,independence_criterion='HSIC',metric='linear',regression_method='GP'):
         '''
             Measure how likely a given causal direction is true
 
@@ -109,8 +122,6 @@ class causation(object):
         '''
         Xtrain, Xtest , Ytrain, Ytest = train_test_split(self.X, self.Y, train_size = train_size)
         if regression_method == 'GP':
-            _gp = GaussianProcess(regr='quadratic')#KernelRidge(kernel='sigmoid',degree=3)
-
             _gp = pyGPs.GPR()      # specify model (GP regression)
             _gp.getPosterior(Xtrain, Ytrain) # fit default model (mean zero & rbf kernel) with data
             _gp.optimize(Xtrain, Ytrain)     # optimize hyperparamters (default optimizer: single run minimize)
@@ -119,7 +130,7 @@ class causation(object):
             #_gp = KernelRidge(kernel='sigmoid',degree=3)
             #_gp.fit(Xtrain,Ytrain)
             ym, ys2, fm, fs2, lp = _gp.predict(Xtest)
-            _gp.plot()
+            #_gp.plot()
             #errors_forward = _gp.predict(Xtest) - Ytest
             errors_forward = ym - Ytest
         else:
@@ -131,7 +142,7 @@ class causation(object):
 
         forward_indep_pval = {
             'kruskal': kruskal(errors_forward,Xtest)[1],
-            'HSIC': self.HilbertSchmidtNormIC(errors_forward,Xtest)[1]
+            'HSIC': self.HilbertSchmidtNormIC(errors_forward,Xtest,metric=metric)[1]
         }[independence_criterion]
 
 
@@ -168,6 +179,33 @@ class causation(object):
         #CCm = pairwise_kernels(self.X,self.Y)
         #res = sum(np.linalg.eigvals(CCm))
 
+
+        #Now using Gamma approximation to get a p-value
+        bone = np.ones((int(m),int(m)))
+        Kc = H*K*H
+        Lc = H*L*H
+
+        #fit Gamma to testStat*m
+        testStat = 1/m * sum(sum(np.dot(np.transpose(Kc),Lc) ) )    #TEST STATISTIC: m*HSICb (under H1)
+        varHSIC = (1/6 * np.dot(Kc,Lc))**2;
+        varHSIC = 1/m/(m-1)* (  sum(  [sum(varHSIC[:,i]) for i in xrange(len(varHSIC))]   ) - (np.trace(varHSIC))  )
+        varHSIC = 72*(m-4)*(m-5)/m/(m-1)/(m-2)/(m-3)  *  varHSIC #variance under H0
+
+        _K = K-np.diag(np.diag(K));
+        _L = L-np.diag(np.diag(L));
+
+        muX = 1/m/(m-1)*np.transpose(bone)*(K*bone)
+        muY = 1/m/(m-1)*np.transpose(bone)*(L*bone)
+
+        mHSIC  = 1/m * ( 1 +muX*muY  - muX - muY )         #mean under H0
+
+        al = mHSIC**2 / varHSIC;
+        bet = varHSIC*m / mHSIC;   #threshold for hsicArr*m
+        alpha = 0.05
+        #This should be done, with varHSIC != 0
+        #from scipy.special import gdtria
+        #thresh = gdtria(1-alpha,al,bet)
+        #print 'thresh:', thresh
         #return (res,1-(1/(1+res) ) )
         return (res,res )
 

@@ -1,4 +1,4 @@
-scipy==0.13.0b1
+scipy==0.16.0
 numpy==1.9.2
 scikit-learn==0.16.1
 matplotlib==1.4.3

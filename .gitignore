@@ -1,1 +1,3 @@
 *.pyc
+shelveKaggleResDict.db
+.ipynb_checkpoints
